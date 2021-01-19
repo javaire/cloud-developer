@@ -1,6 +1,8 @@
 import express from 'express';
 import bodyParser from 'body-parser';
 import {filterImageFromURL, deleteLocalFiles} from './util/util';
+import fs from 'fs'
+import mimeTypes from 'mime-types'
 
 (async () => {
 
@@ -37,6 +39,37 @@ import {filterImageFromURL, deleteLocalFiles} from './util/util';
     res.send("try GET /filteredimage?image_url={{}}")
   } );
   
+
+  // Root Endpoint
+  app.get( "/filteredimage", async ( req: express.Request, res: express.Response ) => {
+    let image_url = req.query.image_url;
+    if (!image_url) {
+      return res.status(400).send({ message: 'image_url parameter is required.' });
+    }
+
+    // create the temp img
+    try {
+      const tmpImage = await filterImageFromURL(image_url);
+
+      // get the mime type from the temp created image
+      const type = mimeTypes.lookup(tmpImage).toString()
+
+      // read the contents of the temp img
+      fs.readFile(tmpImage, function(err, data) {
+        if (err) {
+          // return err in case of failure
+          return res.status(400).send({message: err});
+        }
+        // if success, return img content with content type so the browser can display it
+        return res.status(200).set('Content-Type', type).send(data);
+      });
+
+      // delete the temp im
+      deleteLocalFiles([tmpImage]);
+    } catch(e) {
+      return res.status(422).send({message: e});
+    }
+  });
 
   // Start the Server
   app.listen( port, () => {
